@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/await-thenable */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -6,9 +8,11 @@ import * as adminService from '../services/admin.service'
 import { generateQRCode, sendEmail, sendMailForReject } from '../utils/email'
 import path from 'path'
 import { loginBodyDTO } from '../validator/loginvalidator'
-import { generateIDCardPDF, sendEmailWithAttachments } from '../utils/pdf'
-
+// import { generateIDCardPDF, sendEmailWithAttachments } from '../utils/pdf'
+import { generateIDCardHTML, sendEmailWithAttachment } from '../utils/pdf'
 //LOGIN
+import fs from 'fs'
+import pdf from 'html-pdf'
 export const login = async (
     req: Request,
     res: Response,
@@ -66,7 +70,7 @@ export const sendVerification = async (
     const response = await adminService.verify(id)
     const { teamName, captainName, otp } = response
 
-    const parentFolder = 'X:\\DOMAINS\\JS-Projects\\EventManager_TEXAS_backend\\src\\controllers'
+    const parentFolder = 'F:\\Event-Management-backend-polish\\src\\controllers'
     const subfolder = 'qr'
     const filename = 'qrcode.png'
     const fullPath = path.join(parentFolder, subfolder, filename)
@@ -112,12 +116,21 @@ export const sendVerification = async (
         console.log(sampleMember)
         const ProjectName = proj[0].title
         const TeamName = tea[0].teamName
-        const pdfPaths = await generateIDCardPDF(
-            sampleMember,
-            TeamName,
-            ProjectName
-        )
-        await sendEmailWithAttachments(pdfPaths, email)
+        for (const member of sampleMember) {
+            const htmlContent = generateIDCardHTML(member)
+            console.log(member)
+            console.log(htmlContent)
+            const pdfPath = `./pdfs/${member.name}_IDCard.pdf`
+
+            await pdf.create(htmlContent).toFile(pdfPath, (err) => {
+                if (err) throw err
+            })
+
+            await sendEmailWithAttachment(pdfPath, email)
+
+            // Clean up: Delete the generated PDF after sending the email
+            fs.unlinkSync(pdfPath)
+        }
         res.json(response)
     } catch (err) {
         res.status(500).send('Error sending email')
